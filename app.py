@@ -55,6 +55,14 @@ def get_ca(pki_name: str):
         raise fastapi.HTTPException(404, 'Not found')
     with open(cafile) as f:
         return fastapi.Response(f.read(), status_code=200, headers={'content-type': 'application/x-pem-file', 'content-disposition': 'attachment; filename="ca.crt"'})
+
+@app.get('/pki/{pki_name}/servers')
+def list_servers(pki_name: str):
+    if not (BASE_DIR / pki_name).exists():
+        raise fastapi.HTTPException(404, 'Not found')
+
+    keydir = BASE_DIR / pki_name / 'pki' / 'private'
+    return [k[:-4] for k in os.listdir(keydir)]
     
 @app.put('/pki/{pki_name}/servers/{server_name}')
 def create_server(pki_name: str, server_name: str):
@@ -65,6 +73,7 @@ def create_server(pki_name: str, server_name: str):
     return {
         'detail': 'ok'
     }
+
 @app.get('/pki/{pki_name}/servers/{server_name}/key')
 def get_key(pki_name: str, server_name: str):
     keyfile = BASE_DIR / pki_name / 'pki' / 'private' / ('%s.key' % server_name)
@@ -85,6 +94,24 @@ def get_crt(pki_name: str, server_name: str):
         return fastapi.Response(f.read(), status_code=200, 
                                 headers={'content-type': 'application/x-pem-file', 
                                         'content-disposition': 'attachment; filename="%s.crt"' % server_name})
+
+@app.get('/pki/{pki_name}/servers/{server_name}/fullchain')
+def get_fullchain(pki_name: str, server_name: str):
+    certfile = BASE_DIR / pki_name / 'pki' / 'issued' / ('%s.crt' % server_name)
+    if not certfile.exists():
+        raise fastapi.HTTPException(404, 'Not found')
+    
+    with open(certfile) as f:
+        outfile = f.read() + '\n'
+
+    cafile = BASE_DIR / pki_name / 'pki' / 'ca.crt'
+
+    with open(cafile) as f:
+        outfile += f.read() + '\n'
+
+    return fastapi.Response(outfile, status_code=200, 
+                                headers={'content-type': 'application/x-pem-file', 
+                                        'content-disposition': 'attachment; filename="%s.fullchain.pem"' % server_name})
     
 @app.get('/pki/{pki_name}/servers/{server_name}/req')
 def get_req(pki_name: str, server_name: str):
